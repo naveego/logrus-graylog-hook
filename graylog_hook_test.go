@@ -4,15 +4,17 @@ import (
 	"compress/flate"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	pkgerrors "github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const SyslogInfoLevel = 6
@@ -65,7 +67,105 @@ func TestWritingToUDP(t *testing.T) {
 			msg.File)
 	}
 
-	lineExpected := 34 // Update this if code is updated above
+	lineExpected := 36 // Update this if code is updated above
+	if msg.Line != lineExpected {
+		t.Errorf("msg.Line: expected %d, got %d", lineExpected, msg.Line)
+	}
+
+	if len(msg.Extra) != 2 {
+		t.Errorf("wrong number of extra fields (exp: %d, got %d) in %v", 2, len(msg.Extra), msg.Extra)
+	}
+
+	extra := map[string]interface{}{"foo": "bar", "withField": "1"}
+
+	for k, v := range extra {
+		// Remember extra fileds are prefixed with "_"
+		if msg.Extra["_"+k].(string) != extra[k].(string) {
+			t.Errorf("Expected extra '%s' to be %#v, got %#v", k, v, msg.Extra["_"+k])
+		}
+	}
+}
+
+func TestWritingToHTTP(t *testing.T) {
+
+	var (
+		msg        Message
+		handlerErr error
+		msgRead    chan bool
+	)
+
+	msgRead = make(chan bool)
+
+	http.HandleFunc("/gelf", func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		handlerErr = decoder.Decode(&msg)
+		if handlerErr != nil {
+			t.Fatalf("Couldn't decode message: %s", handlerErr)
+		}
+		w.Write([]byte("ok"))
+		close(msgRead)
+	})
+
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Couldn't get a port: %s", err)
+	}
+
+	listener, err := net.ListenTCP("tcp", addr)
+
+	go func() {
+		err := http.Serve(listener, nil)
+		if err != nil {
+			t.Fatalf("HTTP server: %s", err)
+		}
+	}()
+
+	uri := fmt.Sprintf("http://%s/gelf", listener.Addr())
+
+	hook := NewGraylogHook(uri, map[string]interface{}{"foo": "bar"})
+
+	hook.Host = "testing.local"
+	hook.Blacklist([]string{"filterMe"})
+	msgData := "test message\nsecond line"
+
+	log := logrus.New()
+	log.Out = ioutil.Discard
+	log.Hooks.Add(hook)
+	log.WithFields(logrus.Fields{"withField": "1", "filterMe": "1"}).Info(msgData)
+
+	<-msgRead
+
+	if err != nil {
+		t.Errorf("ReadMessage: %s", err)
+	}
+
+	if msg.Short != "test message" {
+		t.Errorf("msg.Short: expected %s, got %s", msgData, msg.Full)
+	}
+
+	if msg.Full != msgData {
+		t.Errorf("msg.Full: expected %s, got %s", msgData, msg.Full)
+	}
+
+	if msg.Level != SyslogInfoLevel {
+		t.Errorf("msg.Level: expected: %d, got %d)", SyslogInfoLevel, msg.Level)
+	}
+
+	if msg.Host != "testing.local" {
+		t.Errorf("Host should match (exp: testing.local, got: %s)", msg.Host)
+	}
+
+	if len(msg.Extra) != 2 {
+		t.Errorf("wrong number of extra fields (exp: %d, got %d) in %v", 2, len(msg.Extra), msg.Extra)
+	}
+
+	fileExpected := "graylog_hook_test.go"
+	if !strings.HasSuffix(msg.File, fileExpected) {
+		t.Errorf("msg.File: expected %s, got %s", fileExpected,
+			msg.File)
+	}
+
+	lineExpected := 134 // Update this if code is updated above
 	if msg.Line != lineExpected {
 		t.Errorf("msg.Line: expected %d, got %d", lineExpected, msg.Line)
 	}
@@ -269,7 +369,7 @@ func TestStackTracer(t *testing.T) {
 			msg.File)
 	}
 
-	lineExpected := 257 // Update this if code is updated above
+	lineExpected := 357 // Update this if code is updated above
 	if msg.Line != lineExpected {
 		t.Errorf("msg.Line: expected %d, got %d", lineExpected, msg.Line)
 	}
@@ -283,12 +383,12 @@ func TestStackTracer(t *testing.T) {
 		t.Error("Stack Trace is not a string")
 	}
 	stacktraceRE := regexp.MustCompile(`^
-.+/logrus-graylog-hook(%2ev2)?.TestStackTracer
-	/.+/logrus-graylog-hook(.v2)?/graylog_hook_test.go:\d+
+.+/logrus-graylog-hook.TestStackTracer
+	.+[\\/]logrus-graylog-hook[\\/]graylog_hook_test.go:\d+
 testing.tRunner
-	/.*/testing.go:\d+
+	.*[\\/]testing.go:\d+
 runtime.*
-	/.*/runtime/.*:\d+$`)
+	.*[\\/]runtime[\\/].*:\d+$`)
 	if !stacktraceRE.MatchString(stacktrace) {
 		t.Errorf("Stack Trace not as expected. Got:\n%s\n", stacktrace)
 	}
