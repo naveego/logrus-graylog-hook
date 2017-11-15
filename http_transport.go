@@ -26,3 +26,5 @@ func (w *httpTransport) WriteMessage(m *Message) (err error) {
 
 	return err
 }
+
+func (w *httpTransport) SetCompressType(t CompressType) {}

@@ -30,8 +30,8 @@ type Writer struct {
 	CompressionType  CompressType
 }
 
-// What compression type the writer should use when sending messages
-// to the graylog2 server
+// CompressType is the compression type the writer should use when sending messages
+// to the graylog2 server over UDP.
 type CompressType int
 
 const (
@@ -72,6 +72,10 @@ func NewWriter(addr string) (*Writer, error) {
 	var err error
 	var t Transport
 	var segs = strings.Split(addr, "://")
+	w := &Writer{
+		Facility:         path.Base(os.Args[0]),
+		CompressionLevel: flate.BestSpeed,
+	}
 
 	if segs[0] == "http" || segs[0] == "https" {
 		t = &httpTransport{
@@ -81,7 +85,8 @@ func NewWriter(addr string) (*Writer, error) {
 	} else {
 		addr = segs[len(segs)-1]
 		udp := udpTransport{
-			CompressionLevel: flate.BestSpeed,
+			compressionType:  func() CompressType { return w.CompressionType },
+			compressionLevel: func() int { return w.CompressionLevel },
 		}
 
 		if udp.conn, err = net.Dial("udp", addr); err != nil {
@@ -91,28 +96,13 @@ func NewWriter(addr string) (*Writer, error) {
 		t = &udp
 	}
 
-	w := &Writer{
-		Facility:  path.Base(os.Args[0]),
-		Transport: t,
-	}
+	w.Transport = t
 
 	if w.hostname, err = os.Hostname(); err != nil {
 		return nil, err
 	}
 
 	return w, nil
-}
-
-type bufferedWriter struct {
-	buffer *bytes.Buffer
-}
-
-func (bw bufferedWriter) Write(p []byte) (n int, err error) {
-	return bw.buffer.Write(p)
-}
-
-func (bw bufferedWriter) Close() error {
-	return nil
 }
 
 // WriteMessage sends the specified message to the GELF server

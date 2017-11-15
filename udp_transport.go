@@ -39,8 +39,20 @@ func numChunks(b []byte) int {
 
 type udpTransport struct {
 	conn             net.Conn
-	CompressionLevel int // one of the consts from compress/flate
-	CompressionType  CompressType
+	compressionType  func() CompressType
+	compressionLevel func() int
+}
+
+type bufferedWriter struct {
+	buffer *bytes.Buffer
+}
+
+func (bw bufferedWriter) Write(p []byte) (n int, err error) {
+	return bw.buffer.Write(p)
+}
+
+func (bw bufferedWriter) Close() error {
+	return nil
 }
 
 // WriteMessage sends the specified message to the GELF server
@@ -55,16 +67,15 @@ func (w *udpTransport) WriteMessage(m *Message) (err error) {
 
 	var zBuf bytes.Buffer
 	var zw io.WriteCloser
-	switch w.CompressionType {
+	switch w.compressionType() {
 	case CompressGzip:
-		zw, err = gzip.NewWriterLevel(&zBuf, w.CompressionLevel)
+		zw, err = gzip.NewWriterLevel(&zBuf, w.compressionLevel())
 	case CompressZlib:
-		zw, err = zlib.NewWriterLevel(&zBuf, w.CompressionLevel)
+		zw, err = zlib.NewWriterLevel(&zBuf, w.compressionLevel())
 	case NoCompress:
 		zw = bufferedWriter{buffer: &zBuf}
 	default:
-		panic(fmt.Sprintf("unknown compression type %d",
-			w.CompressionType))
+		panic(fmt.Sprintf("unknown compression type %d", w.compressionType()))
 	}
 	if err != nil {
 		return
