@@ -22,7 +22,8 @@ func (w *httpTransport) WriteMessage(m *Message) (err error) {
 
 	buf := bytes.NewBuffer(mBytes)
 
-	_, err = w.client.Post(w.url, "application/json", buf)
+	response, err := w.client.Post(w.url, "application/json", buf)
+	response.Body.Close()
 
 	return err
 }
