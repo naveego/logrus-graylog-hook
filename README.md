@@ -1,7 +1,7 @@
 # Graylog Hook for [Logrus](https://github.com/sirupsen/logrus) <img src="http://i.imgur.com/hTeVwmJ.png" width="40" height="40" alt=":walrus:" class="emoji" title=":walrus:" />&nbsp;[![Build Status](https://travis-ci.org/gemnasium/logrus-graylog-hook.svg?branch=master)](https://travis-ci.org/gemnasium/logrus-graylog-hook)&nbsp;[![godoc reference](https://godoc.org/github.com/gemnasium/logrus-graylog-hook?status.svg)](https://godoc.org/gopkg.in/gemnasium/logrus-graylog-hook.v2)
 
-Use this hook to send your logs to [Graylog](http://graylog2.org) server over UDP.
-The hook is non-blocking: even if UDP is used to send messages, the extra work
+Use this hook to send your logs to [Graylog](http://graylog2.org) server over UDP or HTTP.
+The hook is non-blocking: even if HTTP is used to send messages, the extra work
 should not block the logging function.
 
 All logrus fields will be sent as additional fields on Graylog.
@@ -10,7 +10,9 @@ All logrus fields will be sent as additional fields on Graylog.
 
 The hook must be configured with:
 
-* A Graylog GELF UDP address (a "ip:port" string).
+* An address, one of
+  * A Graylog GELF UDP address (a "ip:port" string).
+  * A Graylog GELF HTTP endpoint (like "http://graylog.example.com/gelf").
 * an optional hash with extra global fields. These fields will be included in all messages sent to Graylog
 
 ```go

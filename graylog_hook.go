@@ -42,6 +42,10 @@ type graylogEntry struct {
 }
 
 // NewGraylogHook creates a hook to be added to an instance of logger.
+// The addr parameter can include a schema,
+// which must be "http", "https", or "udp" (like http://graylog.example.com/gelf),
+// or can be a simple hostname (like 127.0.0.1:12201). If there is no schema
+// the writer will use UDP.
 func NewGraylogHook(addr string, extra map[string]interface{}) *GraylogHook {
 	g, err := NewWriter(addr)
 	if err != nil {
@@ -66,6 +70,10 @@ func NewGraylogHook(addr string, extra map[string]interface{}) *GraylogHook {
 // NewAsyncGraylogHook creates a hook to be added to an instance of logger.
 // The hook created will be asynchronous, and it's the responsibility of the user to call the Flush method
 // before exiting to empty the log queue.
+// The addr parameter can include a schema,
+// which must be "http", "https", or "udp" (like http://graylog.example.com/gelf),
+// or can be a simple hostname (like 127.0.0.1:12201). If there is no schema
+// the writer will use UDP.
 func NewAsyncGraylogHook(addr string, extra map[string]interface{}) *GraylogHook {
 	g, err := NewWriter(addr)
 	if err != nil {
