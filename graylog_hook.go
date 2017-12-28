@@ -57,6 +57,8 @@ func NewGraylogHook(addr string, extra map[string]interface{}) *GraylogHook {
 		host = "localhost"
 	}
 
+	extra["language"] = "go"
+
 	hook := &GraylogHook{
 		Host:        host,
 		Extra:       extra,
@@ -84,6 +86,8 @@ func NewAsyncGraylogHook(addr string, extra map[string]interface{}) *GraylogHook
 	if err != nil {
 		host = "localhost"
 	}
+
+	extra["language"] = "go"
 
 	hook := &GraylogHook{
 		Host:       host,
