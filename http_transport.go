@@ -3,6 +3,7 @@ package graylog
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -23,7 +24,12 @@ func (w *httpTransport) WriteMessage(m *Message) (err error) {
 	buf := bytes.NewBuffer(mBytes)
 
 	response, err := w.client.Post(w.url, "application/json", buf)
-	response.Body.Close()
+	if err != nil {
+		fmt.Printf("Can't send message to graylog: %s", err)
+	}
+	if response.Body != nil {
+		response.Body.Close()
+	}
 
 	return err
 }
